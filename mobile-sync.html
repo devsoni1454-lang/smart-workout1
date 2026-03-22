@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SmartSync Companion</title>
+    <link href="https://fonts.googleapis.com/css?family=Outfit:500,700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #121212;
+            --card: #1e1e1e;
+            --text: #ffffff;
+            --primary: #29b662;
+            --primary-dark: #1e8747;
+            --accent: #00d2ff;
+            --error: #ff4757;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 20px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(30, 30, 30, 1) 0%, rgba(18, 18, 18, 0) 100%);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--error);
+            /* Default disconnected */
+            box-shadow: 0 0 10px var(--error);
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .status-dot.connected {
+            background-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .date-display {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        /* Metric Cards */
+        .metric-card {
+            background-color: var(--card);
+            border-radius: 20px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-info {
+            flex: 1;
+        }
+
+        .metric-title {
+            font-size: 1rem;
+            color: #bbb;
+            margin-bottom: 5px;
+        }
+
+        .metric-input {
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 2.5rem;
+            font-weight: 700;
+            font-family: inherit;
+            width: 100px;
+            outline: none;
+        }
+
+        .metric-input::placeholder {
+            color: #444;
+        }
+
+        .metric-unit {
+            font-size: 1rem;
+            color: #888;
+            margin-left: 5px;
+        }
+
+        .metric-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        /* Colors per metric */
+        .card-steps .metric-icon {
+            background: rgba(0, 210, 255, 0.1);
+            color: var(--accent);
+        }
+
+        .card-calories .metric-icon {
+            background: rgba(255, 107, 107, 0.1);
+            color: #ff6b6b;
+        }
+
+        .card-water .metric-icon {
+            background: rgba(72, 219, 251, 0.1);
+            color: #48dbfb;
+        }
+
+        .card-sleep .metric-icon {
+            background: rgba(155, 89, 182, 0.1);
+            color: #9b59b6;
+        }
+
+        /* Sync Button Container */
+        .bottom-bar {
+            padding: 20px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            background: linear-gradient(0deg, rgba(30, 30, 30, 1) 0%, rgba(18, 18, 18, 0) 100%);
+        }
+
+        .sync-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 25px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: inherit;
+            box-shadow: 0 10px 20px rgba(41, 182, 98, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: transform 0.1s;
+        }
+
+        .sync-btn:active {
+            transform: scale(0.98);
+        }
+
+        .sync-btn.loading {
+            opacity: 0.8;
+            pointer-events: none;
+        }
+
+        /* Full Screen Loader/Message */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.3s;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Initial Authorization Overlay -->
+    <div id="authOverlay" class="overlay">
+        <div class="spinner"></div>
+        <h2 style="margin:0; font-weight:500;">Connecting...</h2>
+        <p id="authMsg" style="color:#888;">Validating token</p>
+    </div>
+
+    <div class="header">
+        <h1>SmartSync</h1>
+        <div id="connectionDot" class="status-dot"></div>
+    </div>
+
+    <div class="content">
+        <div class="date-display" id="dateDisplay">Today</div>
+
+        <!-- Live Run Tracker Card -->
+        <div class="metric-card"
+            style="flex-direction: column; align-items: stretch; background: linear-gradient(135deg, #1e1e1e, #181818);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="metric-title" style="margin: 0; color: var(--primary); font-weight: bold;">Live Run Tracker
+                </div>
+                <div class="metric-icon"
+                    style="background: rgba(41, 182, 98, 0.1); color: var(--primary); width: 30px; height: 30px; font-size: 1rem; border-radius: 8px;">
+                    📍</div>
+            </div>
+
+            <div style="display: flex; justify-content: space-around; text-align: center; margin-bottom: 20px;">
+                <div>
+                    <div id="runDistance" style="font-size: 2.5rem; font-weight: 700; color: var(--text);">0.00</div>
+                    <div style="color: #888; font-size: 0.9rem;">Kilometers</div>
+                </div>
+                <div>
+                    <div id="runTime" style="font-size: 2.5rem; font-weight: 700; color: var(--text);">00:00</div>
+                    <div style="color: #888; font-size: 0.9rem;">Time</div>
+                </div>
+            </div>
+
+            <button id="runBtn" onclick="toggleRun()"
+                style="background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; font-size: 1.1rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: background 0.3s;">
+                START RUN
+            </button>
+            <div id="runStatus"
+                style="text-align: center; font-size: 0.85rem; color: #666; margin-top: 10px; min-height: 15px;">GPS
+                Ready</div>
+        </div>
+
+        <div class="metric-card card-steps">
+            <div class="metric-info">
+                <div class="metric-title">Steps</div>
+                <div>
+                    <input type="number" id="valSteps" class="metric-input" placeholder="0" min="0">
+                </div>
+            </div>
+            <div class="metric-icon">👟</div>
+        </div>
+
+        <div class="metric-card card-calories">
+            <div class="metric-info">
+                <div class="metric-title">Burned</div>
+                <div>
+                    <input type="number" id="valBurn" class="metric-input" placeholder="0" min="0">
+                    <span class="metric-unit">kcal</span>
+                </div>
+            </div>
+            <div class="metric-icon">🔥</div>
+        </div>
+
+        <div class="metric-card card-water">
+            <div class="metric-info">
+                <div class="metric-title">Water</div>
+                <div>
+                    <input type="number" id="valWater" class="metric-input" placeholder="0.0" step="0.1" min="0">
+                    <span class="metric-unit">L</span>
+                </div>
+            </div>
+            <div class="metric-icon">💧</div>
+        </div>
+
+        <div class="metric-card card-sleep">
+            <div class="metric-info">
+                <div class="metric-title">Sleep</div>
+                <div>
+                    <input type="number" id="valSleep" class="metric-input" placeholder="0.0" step="0.5" min="0">
+                    <span class="metric-unit">hrs</span>
+                </div>
+            </div>
+            <div class="metric-icon">💤</div>
+        </div>
+    </div>
+
+    <div class="bottom-bar">
+        <button id="syncBtn" class="sync-btn" onclick="syncData()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M2.13 15.57a10 10 0 1 0 14.3-11.4l-5.35 5.35" />
+            </svg>
+            SYNC TO CLOUD
+        </button>
+    </div>
+
+    <script>
+        // 1. App Initialization & Authentication
+        let userToken = null;
+        const API_URL = window.location.origin + '/api';
+
+        document.getElementById('dateDisplay').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+        // Auto-calculate burned calories based on steps (rough estimate)
+        document.getElementById('valSteps').addEventListener('input', (e) => {
+            const steps = parseInt(e.target.value) || 0;
+            if (steps > 0) {
+                // ~45 calories per 1000 steps
+                document.getElementById('valBurn').value = Math.floor(steps * 0.045);
+            }
+        });
+
+        window.onload = () => {
+            // Get token from URL params
+            const urlParams = new URLSearchParams(window.search);
+            const tokenFromUrl = urlParams.get('token');
+
+            if (tokenFromUrl) {
+                // Save it locally for PWA persistence
+                localStorage.setItem('mobileSyncToken', tokenFromUrl);
+                userToken = tokenFromUrl;
+
+                // Clean URL so it looks nice if added to home screen
+                window.history.replaceState({}, document.title, "/mobile-sync.html");
+            } else {
+                // Check local storage if launched from home screen later
+                userToken = localStorage.getItem('mobileSyncToken');
+            }
+
+            if (userToken) {
+                // We have a token. Let's verify it by hitting a protected route
+                verifyConnection();
+            } else {
+                showAuthError("No pairing token found. Please scan the QR code from your desktop.");
+            }
+        };
+
+        async function verifyConnection() {
+            try {
+                // Simple profile fetch to verify token
+                const res = await fetch(`${API_URL}/users/profile`, {
+                    headers: { 'Authorization': `Bearer ${userToken}` }
+                });
+
+                if (res.ok) {
+                    // Success! Hide overlay
+                    document.getElementById('authOverlay').classList.add('hidden');
+                    document.getElementById('connectionDot').classList.add('connected');
+                } else {
+                    showAuthError("Pairing expired or invalid. Please scan a new QR code.");
+                }
+            } catch (err) {
+                showAuthError("Network error. Cannot connect to server.");
+            }
+        }
+
+        function showAuthError(msg) {
+            document.querySelector('.spinner').style.display = 'none';
+            document.getElementById('authMsg').innerHTML = `<span style="color:var(--error)">${msg}</span>`;
+            document.getElementById('connectionDot').classList.remove('connected');
+        }
+
+        // ==========================================
+        // 2. GPS LIVE RUN TRACKING LOGIC
+        // ==========================================
+        let isRunning = false;
+        let watchId = null;
+        let runStartTime = null;
+        let runTimerInterval = null;
+        let totalDistanceKm = 0;
+        let lastPosition = null;
+
+        const runBtn = document.getElementById('runBtn');
+        const runDistanceEl = document.getElementById('runDistance');
+        const runTimeEl = document.getElementById('runTime');
+        const runStatusEl = document.getElementById('runStatus');
+
+        function toggleRun() {
+            if (!isRunning) {
+                startRun();
+            } else {
+                stopRun();
+            }
+        }
+
+        function startRun() {
+            if (!("geolocation" in navigator)) {
+                runStatusEl.innerText = "GPS not supported by your browser.";
+                runStatusEl.style.color = "var(--error)";
+                return;
+            }
+
+            // Reset UI and Vars
+            totalDistanceKm = 0;
+            lastPosition = null;
+            runDistanceEl.innerText = "0.00";
+            runTimeEl.innerText = "00:00";
+            runStatusEl.innerText = "Acquiring GPS signal...";
+            runStatusEl.style.color = "#aaa";
+
+            runBtn.innerText = "STOP RUN";
+            runBtn.style.background = "var(--error)";
+            isRunning = true;
+            runStartTime = Date.now();
+
+            // Start Timer
+            runTimerInterval = setInterval(updateRunTime, 1000);
+
+            // Start GPS Watch
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
+            };
+
+            watchId = navigator.geolocation.watchPosition(
+                handlePositionUpdate,
+                handlePositionError,
+                options
+            );
+        }
+
+        function stopRun() {
+            isRunning = false;
+            runBtn.innerText = "START RUN";
+            runBtn.style.background = "var(--primary)";
+
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            if (runTimerInterval) {
+                clearInterval(runTimerInterval);
+                runTimerInterval = null;
+            }
+
+            runStatusEl.innerText = "Run saved! Converting to steps/calories...";
+            runStatusEl.style.color = "var(--primary)";
+
+            // Convert distance to Steps & Calories automatically
+            // Avg: 1 km = ~1300 steps. 1 km running = ~60 kcal
+            if (totalDistanceKm > 0.05) { // Only count if they actually moved a bit
+                const newSteps = Math.round(totalDistanceKm * 1300);
+                const newCals = Math.round(totalDistanceKm * 60);
+
+                const stepsInput = document.getElementById('valSteps');
+                const calsInput = document.getElementById('valBurn');
+
+                // Add to whatever is currently in the inputs
+                stepsInput.value = (parseInt(stepsInput.value) || 0) + newSteps;
+                calsInput.value = (parseInt(calsInput.value) || 0) + newCals;
+
+                // Visual flash to show it updated
+                stepsInput.parentElement.parentElement.parentElement.style.transition = 'background-color 0.5s';
+                stepsInput.parentElement.parentElement.parentElement.style.backgroundColor = '#e8f5e9';
+
+                calsInput.parentElement.parentElement.parentElement.style.transition = 'background-color 0.5s';
+                calsInput.parentElement.parentElement.parentElement.style.backgroundColor = '#ffebee';
+
+                setTimeout(() => {
+                    stepsInput.parentElement.parentElement.parentElement.style.backgroundColor = 'var(--card)';
+                    calsInput.parentElement.parentElement.parentElement.style.backgroundColor = 'var(--card)';
+                    runStatusEl.innerText = `Added ${newSteps} steps & ${newCals} kcal! Ready for Sync.`;
+                }, 1500);
+            } else {
+                runStatusEl.innerText = "Run too short to log data.";
+            }
+
+            // Save run details for the sync payload notes
+            window.lastRunData = {
+                distance: totalDistanceKm.toFixed(2),
+                time: runTimeEl.innerText
+            };
+        }
+
+        function updateRunTime() {
+            const elapsedMs = Date.now() - runStartTime;
+            const totalSeconds = Math.floor(elapsedMs / 1000);
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            runTimeEl.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function handlePositionUpdate(position) {
+            runStatusEl.innerText = "Tracking active (GPS Accurate)";
+            runStatusEl.style.color = "var(--primary)";
+
+            const currentPos = {
+                lat: position.coords.latitude,
+                lon: position.coords.longitude
+            };
+
+            if (lastPosition) {
+                // Calculate distance from previous point
+                const distToAdd = calculateDistance(
+                    lastPosition.lat, lastPosition.lon,
+                    currentPos.lat, currentPos.lon
+                );
+
+                // Filter out tiny GPS jitters (less than 2 meters)
+                if (distToAdd > 0.002) {
+                    totalDistanceKm += distToAdd;
+                    runDistanceEl.innerText = totalDistanceKm.toFixed(2);
+                }
+            }
+            lastPosition = currentPos;
+        }
+
+        function handlePositionError(error) {
+            console.warn(`ERROR(${error.code}): ${error.message}`);
+            if (error.code === error.PERMISSION_DENIED) {
+                runStatusEl.innerText = "Location permission denied.";
+                stopRun();
+            } else {
+                runStatusEl.innerText = "Waiting for better GPS signal...";
+                runStatusEl.style.color = "orange";
+            }
+        }
+
+        // Haversine formula to calculate distance between two lat/lon points in km
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = deg2rad(lat2 - lat1);
+            const dLon = deg2rad(lon2 - lon1);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c; // Distance in km
+            return d;
+        }
+
+        function deg2rad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        // ==========================================
+        // 3. Data Syncing to Server
+        // ==========================================
+        async function syncData() {
+            if (!userToken) return;
+
+            const btn = document.getElementById('syncBtn');
+            btn.classList.add('loading');
+            btn.innerHTML = 'SYNCING...';
+
+            const steps = parseInt(document.getElementById('valSteps').value) || 0;
+            const burned = parseInt(document.getElementById('valBurn').value) || 0;
+            const water = parseFloat(document.getElementById('valWater').value) || 0;
+            const sleep = parseFloat(document.getElementById('valSleep').value) || 0;
+
+            // Note: We don't ask for food intake here because it's usually entered throughout the day on the main app,
+            // but if the user wants it, they can use the desktop interface.
+
+            // Build the notes string. If we have a recorded run, append it.
+            let syncNotes = "Synced from mobile app";
+            if (window.lastRunData && window.lastRunData.distance > 0) {
+                syncNotes += ` | GPS Run: ${window.lastRunData.distance}km in ${window.lastRunData.time}`;
+            }
+
+            const payload = {
+                date: new Date().toISOString().split('T')[0],
+                steps: steps,
+                caloriesBurned: burned,
+                waterIntake: water,
+                sleepHours: sleep,
+                notes: syncNotes
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/tracker`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    btn.innerHTML = 'SYNC SUCCESSFUL!';
+                    btn.style.background = 'linear-gradient(135deg, #4caf50, #2e7d32)';
+
+                    setTimeout(() => {
+                        btn.innerHTML = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M2.13 15.57a10 10 0 1 0 14.3-11.4l-5.35 5.35"/></svg> SYNC CLOUD AGAIN`;
+                        btn.style.background = '';
+                        btn.classList.remove('loading');
+
+                        // Note: Desktop polling mechanism (fetchRecordsSilently) will pick this up!
+                    }, 2000);
+                } else {
+                    throw new Error("Server rejected data");
+                }
+            } catch (e) {
+                btn.innerHTML = 'SYNC FAILED - TAP TO RETRY';
+                btn.style.background = 'linear-gradient(135deg, var(--error), #d32f2f)';
+                btn.classList.remove('loading');
+                setTimeout(() => {
+                    btn.style.background = '';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+
+</html>
